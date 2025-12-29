@@ -24,6 +24,7 @@ class StructureInfo:
     begin: str
     end: str
     trigger: str
+    begin_is_regex: bool = False
 
 
 """

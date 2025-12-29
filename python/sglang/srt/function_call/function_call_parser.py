@@ -152,6 +152,7 @@ class FunctionCallParser:
             tool_structures.append(
                 StructuresResponseFormat(
                     begin=info.begin,
+                    begin_is_regex=info.begin_is_regex,
                     schema=schema,  # type: ignore
                     end=info.end,
                 )

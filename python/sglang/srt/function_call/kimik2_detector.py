@@ -226,14 +226,19 @@ class KimiK2Detector(BaseFormatDetector):
             logger.error(f"Error in parse_streaming_increment: {e}")
             return StreamingParseResult(normal_text=current_text)
 
+    def supports_structural_tag(self) -> bool:
+        return True
+
     def structure_info(self) -> _GetInfoFunc:
         """Return function that creates StructureInfo for guided generation."""
 
         def get_info(name: str) -> StructureInfo:
+            # begin=f"<|tool_calls_section_begin|><|tool_call_begin|>functions.{name}:0<|tool_call_argument_begin|>",
             return StructureInfo(
-                begin=f"<|tool_calls_section_begin|><|tool_call_begin|>functions.{name}:0<|tool_call_argument_begin|>",
-                end="<|tool_call_end|><|tool_calls_section_end|>",
-                trigger="<|tool_calls_section_begin|>",
+                begin=f"functions\.{name}:(0|[1-9]\d*)<\|tool_call_argument_begin\|>",
+                end="<|tool_call_end|>",
+                trigger="<|tool_call_begin|>",
+                begin_is_regex=True,
             )
 
         return get_info

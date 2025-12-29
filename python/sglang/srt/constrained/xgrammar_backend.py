@@ -250,6 +250,7 @@ class XGrammarGrammarBackend(BaseGrammarBackend):
                         begin=structure["begin"],
                         schema=json.dumps(structure["schema"]),
                         end=structure["end"],
+                        begin_is_regex=structure.get("begin_is_regex", False),
                     )
                     for structure in structural_tag["structures"]
                 ]

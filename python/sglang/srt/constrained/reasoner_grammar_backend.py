@@ -13,6 +13,7 @@
 # ==============================================================================
 """The baseclass of a backend for reasoner grammar-guided constrained decoding."""
 
+import logging
 from typing import List, Optional, Tuple
 
 import torch
@@ -23,17 +24,42 @@ from .base_grammar_backend import (
     BaseGrammarObject,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ReasonerGrammarObject(BaseGrammarObject):
     def __init__(self, grammar: BaseGrammarObject, think_end_id):
         super().__init__()
         self.grammar = grammar
         self.think_end_id = think_end_id
-        self.is_in_reasoning = True
+        self.is_in_reasoning = False  # Disable enforce reasoning
+        self.is_think_started = False
+        self.think_token = 0
 
     def accept_token(self, token: int):
+        if self.is_in_reasoning or self.is_think_started:
+            self.think_token += 1
+
+        """
+        special_end_tokens = set([163585, 163586, 163591, 163593, 163596, 163599])
+        if (self.is_in_reasoning or self.is_think_started) and (
+            token in special_end_tokens
+        ):
+            logging.error("DAMN SGLANG accept special end token {token} during think")
+        """
+
+        if token == 163606:
+            # logging.error("DAMN SGLANG accept think start token")
+            self.is_think_started = True
+            self.is_in_reasoning = True
+            self.think_token = 0
+            return
+
         if token == self.think_end_id:
+            # logging.error(f"DAMN SGLANG accept think end token {self.think_token}")
+            self.is_think_started = False
             self.is_in_reasoning = False
+            return
 
         if not self.is_in_reasoning and token != self.think_end_id:
             self.grammar.accept_token(token)
@@ -41,9 +67,62 @@ class ReasonerGrammarObject(BaseGrammarObject):
     def allocate_vocab_mask(
         self, vocab_size: int, batch_size: int, device
     ) -> torch.Tensor:
+        """
+        if self.is_think_started:
+            ret = torch.zeros(batch_size, vocab_size, dtype=torch.bool, device=device)
+            logging.error(f"FUCK SGLANG allocate_vocab_mask in ReasonerGrammarObject {ret.dtype}")
+            return ret
+        """
         return self.grammar.allocate_vocab_mask(vocab_size, batch_size, device)
 
+    def set_token_allowed(
+        self,
+        bitmask: torch.Tensor,
+        token_id: int,
+        batch_idx: int = 0,
+        allowed: bool = True,
+    ):
+        element_idx = token_id // 32
+        bit_idx = token_id % 32
+        current_value = bitmask[batch_idx, element_idx].item()
+
+        if allowed:
+            new_value = current_value | (1 << bit_idx)
+        else:
+            new_value = current_value & ~(1 << bit_idx)
+        bitmask[batch_idx, element_idx] = new_value
+
     def fill_vocab_mask(self, vocab_mask: torch.Tensor, idx: int) -> None:
+        vocab_mask[idx].fill_(-1)
+        if self.is_think_started and (self.think_token < 2048):
+            # logging.error(f"DAMN SGLANG think length {self.think_token}")
+            token_ids = [
+                163606,
+                163595,
+                163597,
+                163598,
+                163599,
+                163596,
+            ]
+            for token_id in token_ids:
+                self.set_token_allowed(vocab_mask, token_id, idx, False)
+            special_end_tokens = [163585, 163586, 163591, 163593, 163596, 163599]
+            for token_id in special_end_tokens:
+                self.set_token_allowed(vocab_mask, token_id, idx, False)
+            return
+
+        if (self.is_in_reasoning or self.is_think_started) and (
+            self.think_token >= 2048
+        ):
+            vocab_mask[idx].fill_(0)
+            # logging.error(f"DAMN SGLANG think too long {self.think_token}")
+            token_ids = [
+                163607,
+            ]
+            for token_id in token_ids:
+                self.set_token_allowed(vocab_mask, token_id, idx, True)
+            return
+
         if not self.is_in_reasoning:
             self.grammar.fill_vocab_mask(vocab_mask, idx)
 

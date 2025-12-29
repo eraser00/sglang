@@ -131,6 +131,7 @@ class ResponseFormat(BaseModel):
 
 class StructuresResponseFormat(BaseModel):
     begin: str
+    begin_is_regex: Optional[bool] = False
     schema_: Optional[Dict[str, object]] = Field(alias="schema", default=None)
     end: str
 

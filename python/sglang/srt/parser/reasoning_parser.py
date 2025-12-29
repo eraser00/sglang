@@ -28,6 +28,7 @@ class BaseReasoningFormatDetector:
         self.think_start_token = think_start_token
         self.think_end_token = think_end_token
         self._in_reasoning = force_reasoning
+        self.force_reasoning = force_reasoning
         self.stream_reasoning = stream_reasoning
 
         self._buffer = ""
